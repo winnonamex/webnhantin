@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Local Messenger</title>
+
+<style>
+body{
+margin:0;
+font-family:Arial;
+background:#0f172a;
+color:white;
+height:100vh;
+display:flex;
+flex-direction:column;
+}
+
+/* LOGIN */
+#loginBox{
+width:300px;
+margin:100px auto;
+}
+
+input{
+padding:10px;
+margin:5px 0;
+width:100%;
+border:none;
+border-radius:6px;
+}
+
+button{
+padding:10px 15px;
+border:none;
+border-radius:6px;
+background:#6366f1;
+color:white;
+cursor:pointer;
+}
+
+button:hover{
+background:#4f46e5;
+}
+
+/* APP */
+#appBox{
+display:none;
+flex:1;
+flex-direction:column;
+}
+
+#top{
+background:#1e293b;
+padding:10px;
+display:flex;
+justify-content:space-between;
+align-items:center;
+}
+
+#main{
+flex:1;
+display:flex;
+overflow:hidden;
+}
+
+#sidebar{
+width:220px;
+background:#111827;
+padding:10px;
+overflow:auto;
+}
+
+#chatArea{
+flex:1;
+display:flex;
+flex-direction:column;
+}
+
+#messages{
+flex:1;
+overflow:auto;
+padding:15px;
+background:#0b1120;
+}
+
+.msg{
+margin:6px 0;
+padding:8px;
+background:#1e293b;
+border-radius:6px;
+}
+
+#inputArea{
+display:flex;
+padding:10px;
+background:#111827;
+gap:8px;
+align-items:center;
+}
+
+/* Ô nhập to hơn */
+#msgInput{
+flex:1;
+padding:12px;
+font-size:16px;
+}
+
+/* File nhỏ lại */
+#fileInput{
+width:120px;
+font-size:12px;
+}
+
+#inputArea button{
+width:80px;
+}
+
+img{
+max-width:200px;
+display:block;
+margin-top:5px;
+}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="loginBox">
+<h2>🔐 Local Messenger</h2>
+<input type="text" id="userInput" placeholder="Username">
+<input type="password" id="passInput" placeholder="Password">
+<button onclick="register()">Đăng ký</button>
+<button onclick="login()">Đăng nhập</button>
+</div>
+
+<!-- APP -->
+<div id="appBox">
+<div id="top">
+<div>👤 <span id="currentUser"></span></div>
+<button onclick="logout()">Đăng xuất</button>
+</div>
+
+<div id="main">
+
+<div id="sidebar">
+<h3>Users</h3>
+<div id="userList"></div>
+<hr>
+<h3>Groups</h3>
+<div id="groupList"></div>
+<button onclick="createGroup()">+ Tạo nhóm</button>
+</div>
+
+<div id="chatArea">
+<div id="messages"></div>
+
+<div id="inputArea">
+<input type="text" id="msgInput" placeholder="Nhắn tin..."
+onkeypress="if(event.key==='Enter') sendMessage()">
+<input type="file" id="fileInput">
+<button onclick="sendMessage()">Gửi</button>
+</div>
+
+</div>
+</div>
+</div>
+
+<script>
+let users = JSON.parse(localStorage.getItem("users") || "{}");
+let chats = JSON.parse(localStorage.getItem("chats") || "{}");
+let currentUser = null;
+let currentChat = null;
+
+function save(){
+localStorage.setItem("users", JSON.stringify(users));
+localStorage.setItem("chats", JSON.stringify(chats));
+}
+
+function register(){
+let u = userInput.value.trim();
+let p = passInput.value.trim();
+if(!u || !p){ alert("Nhập đủ thông tin"); return; }
+if(users[u]){ alert("User đã tồn tại"); return; }
+users[u] = { password: p };
+save();
+alert("Đăng ký thành công!");
+}
+
+function login(){
+let u = userInput.value.trim();
+let p = passInput.value.trim();
+if(users[u] && users[u].password === p){
+currentUser = u;
+loginBox.style.display = "none";
+appBox.style.display = "flex";
+document.getElementById("currentUser").innerText = u;
+renderUsers();
+renderGroups();
+}else{
+alert("Sai tài khoản");
+}
+}
+
+function logout(){
+location.reload();
+}
+
+function renderUsers(){
+let box = document.getElementById("userList");
+box.innerHTML = "";
+Object.keys(users).forEach(u=>{
+if(u !== currentUser){
+let btn = document.createElement("button");
+btn.innerText = u;
+btn.style.display="block";
+btn.style.marginBottom="5px";
+btn.onclick = ()=> openChat("private_"+[currentUser,u].sort().join("_"));
+box.appendChild(btn);
+}
+});
+}
+
+function renderGroups(){
+let box = document.getElementById("groupList");
+box.innerHTML = "";
+Object.keys(chats).forEach(c=>{
+if(c.startsWith("group_")){
+let btn = document.createElement("button");
+btn.innerText = c.replace("group_","");
+btn.style.display="block";
+btn.style.marginBottom="5px";
+btn.onclick = ()=> openChat(c);
+box.appendChild(btn);
+}
+});
+}
+
+function createGroup(){
+let name = prompt("Tên nhóm:");
+if(!name) return;
+let id = "group_" + name;
+if(!chats[id]) chats[id] = [];
+save();
+renderGroups();
+}
+
+function openChat(id){
+currentChat = id;
+if(!chats[id]) chats[id] = [];
+renderChat();
+}
+
+function sendMessage(){
+if(!currentChat){ alert("Chọn chat trước!"); return; }
+
+let text = msgInput.value.trim();
+let file = fileInput.files[0];
+if(!text && !file) return;
+
+let msg = { user: currentUser, text: text };
+
+if(file){
+let reader = new FileReader();
+reader.onload = function(e){
+msg.file = e.target.result;
+chats[currentChat].push(msg);
+save();
+renderChat();
+};
+reader.readAsDataURL(file);
+}else{
+chats[currentChat].push(msg);
+save();
+renderChat();
+}
+
+msgInput.value="";
+fileInput.value="";
+}
+
+function renderChat(){
+let box = document.getElementById("messages");
+box.innerHTML="";
+if(!currentChat) return;
+
+chats[currentChat].forEach(m=>{
+let div = document.createElement("div");
+div.className="msg";
+div.innerHTML="<b>"+m.user+"</b>: "+(m.text||"");
+if(m.file){
+div.innerHTML+=`<img src="${m.file}">`;
+}
+box.appendChild(div);
+});
+box.scrollTop = box.scrollHeight;
+}
+</script>
+
+</body>
+</html>
